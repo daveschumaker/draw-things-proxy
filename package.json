@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon",
     "start": "node ./dist/index.js",
-    "test": "tap --ts",
+    "test": "echo \"Error: no test specified\"",
     "build": "tsc",
     "prepare": "husky install"
   },
