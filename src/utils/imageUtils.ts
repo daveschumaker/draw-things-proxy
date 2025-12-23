@@ -1,7 +1,19 @@
+/**
+ * Utility functions for handling image storage operations.
+ */
+
 import fs from 'fs'
 import path from 'path'
 import { Constants } from '../models/constants'
 
+/**
+ * Saves a base64-encoded image to the filesystem.
+ * Creates the output directory if it doesn't exist.
+ *
+ * @param base64Image - The base64-encoded image data (without the data URI prefix)
+ * @param jobId - The unique job identifier to use as the filename
+ * @throws Error if the image cannot be saved to disk
+ */
 export async function saveImage(
   base64Image: string,
   jobId: string

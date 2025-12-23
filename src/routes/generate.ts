@@ -5,9 +5,9 @@ import { getImageGenerationAppStatus } from '../controllers/imageAppController'
 const router = Router()
 
 router.post('/', async (req: Request, res: Response) => {
-  if (!getImageGenerationAppStatus) {
+  if (!getImageGenerationAppStatus()) {
     return res
-      .status(500)
+      .status(503)
       .json({ error: 'Image generation app is not running' })
   }
 

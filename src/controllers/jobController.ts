@@ -92,6 +92,13 @@ const agent = new http.Agent({
   keepAlive: true
 })
 
+/**
+ * Creates a hash from the provided data using the shake256 algorithm.
+ *
+ * @param data - The string data to hash
+ * @param len - The desired output length in bytes
+ * @returns A hexadecimal hash string
+ */
 function createHash(data: string, len: number): string {
   return crypto
     .createHash('shake256', { outputLength: len })
@@ -99,21 +106,42 @@ function createHash(data: string, len: number): string {
     .digest('hex')
 }
 
+/**
+ * Adds a new image generation job to the queue.
+ * If no seed is provided or seed is -1, a random seed will be generated.
+ *
+ * @param payload - The image processing configuration
+ * @returns The unique job ID for tracking the job status
+ */
 export function addJob(payload: Partial<ImageProcessingConfig>): string {
   if (!payload.seed || payload.seed === -1) {
     payload.seed = Math.floor(Math.random() * 4294967295) + 1
   }
 
-  const jobId = createHash(String(Date.now()), 10)
+  // Include random component to ensure uniqueness even for concurrent requests
+  const uniqueString = `${Date.now()}-${Math.random()}`
+  const jobId = createHash(uniqueString, 10)
   queue.push({ jobId, payload, retries: 0 })
   console.log(`Job ${jobId} added to queue. Queue length: ${queue.length}`)
   return jobId
 }
 
+/**
+ * Gets the position of a job in the queue.
+ *
+ * @param jobId - The unique job identifier
+ * @returns The zero-based position in the queue, or -1 if not found
+ */
 export function getJobPosition(jobId: string): number {
   return queue.findIndex((job) => job.jobId === jobId)
 }
 
+/**
+ * Gets the queue positions for multiple jobs.
+ *
+ * @param jobIds - Array of job identifiers to check
+ * @returns Array of objects containing jobId and position
+ */
 export function getJobStatuses(
   jobIds: string[]
 ): { jobId: string; position: number }[] {
@@ -127,6 +155,13 @@ interface ImageResponseSuccess {
   images: string[]
 }
 
+/**
+ * Processes a single job by sending the request to the DrawThings API.
+ * On connection errors, attempts to retrieve the image from the local filesystem.
+ * Failed jobs are retried up to MAX_RETRIES times before being removed from the queue.
+ *
+ * @param job - The job to process
+ */
 async function processJob(job: Job): Promise<void> {
   const targetUrl = Constants.API_URL
 
@@ -191,6 +226,13 @@ async function processJob(job: Job): Promise<void> {
   }
 }
 
+/**
+ * Attempts to retrieve a locally generated image from the DrawThings output directory.
+ * This serves as a fallback when the API connection fails but the image was still generated.
+ *
+ * @param seed - The seed value used to generate the image
+ * @returns Base64-encoded image data if found, null otherwise
+ */
 async function getLocalImage(seed: number): Promise<string | null> {
   const directory = Constants.DRAW_THINGS_IMAGE_DIR
   const files = await fs.promises.readdir(directory)
@@ -206,6 +248,7 @@ async function getLocalImage(seed: number): Promise<string | null> {
     }))
   )
 
+  // Sort by modification time, most recent first
   fileStats.sort((a, b) => b.mtime - a.mtime)
 
   if (fileStats.length > 0) {
@@ -218,20 +261,44 @@ async function getLocalImage(seed: number): Promise<string | null> {
   return null
 }
 
-async function processQueue() {
-  if (isProcessing || queue.length === 0) return
+/**
+ * Processes the next job in the queue.
+ * Uses a setTimeout chain to ensure jobs are processed sequentially
+ * without race conditions.
+ */
+async function processQueue(): Promise<void> {
+  if (isProcessing || queue.length === 0) {
+    // If no jobs to process, check again in 2 seconds
+    if (!isProcessing && queue.length === 0) {
+      setTimeout(() => processQueue(), 2000)
+    }
+    return
+  }
 
   isProcessing = true
   const job = queue[0]
   await processJob(job)
   isProcessing = false
 
-  // Schedule the next job processing
+  // Process next job after a 1 second delay
   setTimeout(() => processQueue(), 1000)
 }
 
-function startProcessing() {
-  setInterval(() => processQueue(), 2000)
+/**
+ * Starts the job queue processing loop.
+ * This should be called once on application startup.
+ */
+function startProcessing(): void {
+  processQueue()
+}
+
+/**
+ * Resets the job queue state. FOR TESTING PURPOSES ONLY.
+ * @internal
+ */
+export function resetQueue(): void {
+  queue = []
+  isProcessing = false
 }
 
 export default { addJob, getJobPosition, getJobStatuses, startProcessing }

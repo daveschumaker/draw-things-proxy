@@ -16,7 +16,7 @@ const compat = new FlatCompat({
 
 export default [
     {
-        ignores: ['**/build/', '**/dist/']
+        ignores: ['**/build/', '**/dist/', '**/coverage/']
     },
     ...compat.extends(
         'eslint:recommended',
@@ -60,6 +60,19 @@ export default [
                     ignoreRestSiblings: false
                 }
             ]
+        }
+    },
+    {
+        files: ['**/*.test.ts', '**/*.spec.ts'],
+
+        languageOptions: {
+            globals: {
+                ...globals.jest
+            }
+        },
+
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off'
         }
     }
 ]
