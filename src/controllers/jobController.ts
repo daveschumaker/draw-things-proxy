@@ -78,14 +78,32 @@ type ImageProcessingConfig = {
   num_frames: number
 }
 
+/**
+ * Job status enum
+ */
+/* eslint-disable no-unused-vars */
+export enum JobStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed'
+}
+/* eslint-enable no-unused-vars */
+
 interface Job {
   jobId: string
   payload: Partial<ImageProcessingConfig>
   retries: number
+  status: JobStatus
+  error?: string
+  createdAt: number
+  completedAt?: number
 }
 
 let queue: Job[] = []
+const completedJobs: Map<string, Job> = new Map()
 const MAX_RETRIES = 3
+const COMPLETED_JOB_TTL = 3600000 // 1 hour in milliseconds
 let isProcessing = false
 
 const agent = new http.Agent({
@@ -121,7 +139,16 @@ export function addJob(payload: Partial<ImageProcessingConfig>): string {
   // Include random component to ensure uniqueness even for concurrent requests
   const uniqueString = `${Date.now()}-${Math.random()}`
   const jobId = createHash(uniqueString, 10)
-  queue.push({ jobId, payload, retries: 0 })
+
+  const job: Job = {
+    jobId,
+    payload,
+    retries: 0,
+    status: JobStatus.PENDING,
+    createdAt: Date.now()
+  }
+
+  queue.push(job)
   console.log(`Job ${jobId} added to queue. Queue length: ${queue.length}`)
   return jobId
 }
@@ -137,18 +164,56 @@ export function getJobPosition(jobId: string): number {
 }
 
 /**
- * Gets the queue positions for multiple jobs.
+ * Gets detailed status information for multiple jobs.
+ * Checks both the active queue and completed jobs.
  *
  * @param jobIds - Array of job identifiers to check
- * @returns Array of objects containing jobId and position
+ * @returns Array of objects containing detailed job status
  */
-export function getJobStatuses(
-  jobIds: string[]
-): { jobId: string; position: number }[] {
-  return jobIds.map((jobId) => ({
-    jobId,
-    position: getJobPosition(jobId)
-  }))
+export function getJobStatuses(jobIds: string[]): {
+  jobId: string
+  position: number
+  status: JobStatus
+  error?: string
+  createdAt?: number
+  completedAt?: number
+}[] {
+  return jobIds.map((jobId) => {
+    // Check queue first
+    const queuePosition = queue.findIndex((job) => job.jobId === jobId)
+    if (queuePosition !== -1) {
+      const job = queue[queuePosition]
+      return {
+        jobId,
+        position: queuePosition,
+        status: job.status,
+        error: job.error,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt
+      }
+    }
+
+    // Check completed jobs
+    const completedJob = completedJobs.get(jobId)
+    if (completedJob) {
+      return {
+        jobId,
+        position: -1,
+        status: completedJob.status,
+        error: completedJob.error,
+        createdAt: completedJob.createdAt,
+        completedAt: completedJob.completedAt
+      }
+    }
+
+    // Job not found
+    return {
+      jobId,
+      position: -1,
+      status: JobStatus.FAILED,
+      error: 'Job not found'
+    }
+  })
 }
 
 interface ImageResponseSuccess {
@@ -158,12 +223,15 @@ interface ImageResponseSuccess {
 /**
  * Processes a single job by sending the request to the DrawThings API.
  * On connection errors, attempts to retrieve the image from the local filesystem.
- * Failed jobs are retried up to MAX_RETRIES times before being removed from the queue.
+ * Failed jobs are retried up to MAX_RETRIES times before being marked as failed.
  *
  * @param job - The job to process
  */
 async function processJob(job: Job): Promise<void> {
   const targetUrl = Constants.API_URL
+
+  // Mark job as processing
+  job.status = JobStatus.PROCESSING
 
   try {
     console.log(`Processing job ${job.jobId}`)
@@ -183,6 +251,14 @@ async function processJob(job: Job): Promise<void> {
     await saveImage(data.images[0], job.jobId)
     console.log(`Job ${job.jobId} completed successfully`)
 
+    // Mark job as completed and move to completed jobs
+    job.status = JobStatus.COMPLETED
+    job.completedAt = Date.now()
+    completedJobs.set(job.jobId, job)
+
+    // Clean up old completed jobs
+    cleanupCompletedJobs()
+
     queue = queue.filter((queuedJob) => queuedJob.jobId !== job.jobId)
     console.log(
       `Job ${job.jobId} removed from queue. Queue length: ${queue.length}`
@@ -190,7 +266,14 @@ async function processJob(job: Job): Promise<void> {
   } catch (error) {
     console.error(`Error processing job ${job.jobId}:`, error)
 
-    if (error.code === 'ECONNRESET' || error.type === 'system') {
+    // Safe error type checking
+    const isConnectionError =
+      error &&
+      typeof error === 'object' &&
+      ('code' in error || 'type' in error) &&
+      (error.code === 'ECONNRESET' || error.type === 'system')
+
+    if (isConnectionError) {
       console.log(`Attempting to fetch local image for job ${job.jobId}`)
       try {
         const localImageBase64 = await getLocalImage(job.payload.seed)
@@ -199,6 +282,13 @@ async function processJob(job: Job): Promise<void> {
           console.log(
             `Job ${job.jobId} completed successfully with local image`
           )
+
+          // Mark job as completed
+          job.status = JobStatus.COMPLETED
+          job.completedAt = Date.now()
+          completedJobs.set(job.jobId, job)
+          cleanupCompletedJobs()
+
           queue = queue.filter((queuedJob) => queuedJob.jobId !== job.jobId)
           return
         }
@@ -212,16 +302,41 @@ async function processJob(job: Job): Promise<void> {
 
     if (job.retries < MAX_RETRIES) {
       job.retries++
+      job.status = JobStatus.PENDING // Reset to pending for retry
       queue.push(job)
       console.log(
         `Retrying job ${job.jobId} (attempt ${job.retries}). Queue length: ${queue.length}`
       )
     } else {
       console.error(`Job ${job.jobId} failed after ${MAX_RETRIES} retries.`)
+
+      // Mark job as failed and move to completed jobs
+      job.status = JobStatus.FAILED
+      job.completedAt = Date.now()
+      job.error =
+        error instanceof Error
+          ? error.message
+          : 'Unknown error occurred during processing'
+      completedJobs.set(job.jobId, job)
+      cleanupCompletedJobs()
+
       queue = queue.filter((queuedJob) => queuedJob.jobId !== job.jobId)
       console.log(
         `Job ${job.jobId} removed from queue after max retries. Queue length: ${queue.length}`
       )
+    }
+  }
+}
+
+/**
+ * Removes completed jobs that have exceeded the TTL
+ */
+function cleanupCompletedJobs(): void {
+  const now = Date.now()
+  for (const [jobId, job] of completedJobs.entries()) {
+    if (job.completedAt && now - job.completedAt > COMPLETED_JOB_TTL) {
+      completedJobs.delete(jobId)
+      console.log(`Cleaned up completed job ${jobId}`)
     }
   }
 }
@@ -298,6 +413,7 @@ function startProcessing(): void {
  */
 export function resetQueue(): void {
   queue = []
+  completedJobs.clear()
   isProcessing = false
 }
 

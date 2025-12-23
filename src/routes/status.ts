@@ -1,23 +1,21 @@
 import { Router, Request, Response } from 'express'
 import { getJobStatuses } from '../controllers/jobController'
+import { validateQuery } from '../middleware/validation'
+import { jobStatusQuerySchema } from '../models/schemas'
 
 const router = Router()
 
-router.get('/', (req: Request, res: Response) => {
-  let jobIds: string[] = []
+router.get(
+  '/',
+  validateQuery(jobStatusQuerySchema),
+  (req: Request, res: Response) => {
+    const jobIds = req.query.id as string[]
 
-  if (typeof req.query.id === 'string') {
-    jobIds = req.query.id.split(',')
-  } else if (Array.isArray(req.query.id)) {
-    jobIds = req.query.id.flatMap((id) =>
-      typeof id === 'string' ? id.split(',') : []
-    )
+    console.log('Received status request for jobs:', jobIds)
+    const statuses = getJobStatuses(jobIds)
+    console.log('Sending status response:', statuses)
+    res.json(statuses)
   }
-
-  console.log('Received status request for jobs:', jobIds)
-  const statuses = getJobStatuses(jobIds)
-  console.log('Sending status response:', statuses)
-  res.json(statuses)
-})
+)
 
 export default router
