@@ -50,6 +50,12 @@ const envSchema = z.object({
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).default(100),
   RATE_LIMIT_GENERATE_MAX: z.coerce.number().int().min(1).default(10),
 
+  // Logging configuration
+  LOG_LEVEL: z
+    .enum(['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'])
+    .default('info'),
+  LOG_FORMAT: z.enum(['json', 'simple']).default('simple'),
+
   // CORS configuration
   CORS_ORIGIN: z.string().default('*'),
   CORS_CREDENTIALS: z.coerce.boolean().default(false)

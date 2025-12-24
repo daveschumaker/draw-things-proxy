@@ -5,6 +5,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Constants } from '../models/constants'
+import { log } from './logger'
 
 /**
  * Saves a base64-encoded image to the filesystem.
@@ -20,15 +21,15 @@ export async function saveImage(
 ): Promise<void> {
   try {
     const imageDir = Constants.SAVE_IMAGE_DIR
-    console.log(`Attempting to save image for job ${jobId}`)
+    log.debug('Attempting to save image', { jobId })
     await fs.promises.mkdir(imageDir, { recursive: true })
 
     const buffer = Buffer.from(base64Image, 'base64')
     const imagePath = path.join(imageDir, `${jobId}.png`)
     await fs.promises.writeFile(imagePath, buffer)
-    console.log(`Image saved successfully: ${imagePath}`)
+    log.info('Image saved successfully', { jobId, imagePath })
   } catch (error) {
-    console.error(`Error saving image for job ${jobId}:`, error)
+    log.error('Error saving image', { jobId, error })
     throw error
   }
 }

@@ -73,6 +73,14 @@ export const config = {
   },
 
   /**
+   * Logging configuration
+   */
+  logging: {
+    level: env.LOG_LEVEL,
+    format: env.LOG_FORMAT
+  },
+
+  /**
    * CORS configuration
    */
   cors: {

@@ -7,6 +7,7 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { sendSuccess } from '../utils/apiResponse'
 import { ServiceUnavailableError } from '../errors'
 import { generateLimiter } from '../middleware/rateLimiter'
+import { log } from '../utils/logger'
 
 const router = Router()
 
@@ -19,10 +20,10 @@ router.post(
       throw new ServiceUnavailableError('Image generation app is not running')
     }
 
-    console.log('Received generate request:', req.body)
+    log.info('Received generate request', { body: req.body })
     const jobId = addJob(req.body)
     const position = getJobPosition(jobId)
-    console.log(`Job ${jobId} added at position ${position}`)
+    log.info('Job added to queue', { jobId, position })
 
     sendSuccess(res, { jobId, position }, 201, 'Job added to queue')
   })

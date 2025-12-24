@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express'
 import { ZodError } from 'zod'
 import { AppError } from '../errors'
 import { config } from '../config'
+import { log } from '../utils/logger'
 
 /**
  * Standard error response format
@@ -26,14 +27,14 @@ function logError(error: Error | AppError): void {
 
   if (isOperational) {
     // Operational errors are expected and logged as warnings
-    console.warn('[Operational Error]', {
+    log.warn('Operational error', {
       message: error.message,
       statusCode: error instanceof AppError ? error.statusCode : 500,
       details: error instanceof AppError ? error.details : undefined
     })
   } else {
     // Programming errors or unexpected failures are logged as errors
-    console.error('[Unexpected Error]', {
+    log.error('Unexpected error', {
       message: error.message,
       stack: error.stack
     })

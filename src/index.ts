@@ -7,6 +7,7 @@ import jobController from './controllers/jobController'
 import { checkImageGenerationAppStatus } from './controllers/imageAppController'
 import { errorHandler } from './middleware/errorHandler'
 import { generalLimiter } from './middleware/rateLimiter'
+import { log } from './utils/logger'
 
 const app: Express = express()
 
@@ -48,8 +49,8 @@ setInterval(checkImageGenerationAppStatus, config.health.checkInterval)
 
 // Start server
 app.listen(config.server.port, () => {
-  console.log(
-    `[server]: Server is running at http://${config.server.host}:${config.server.port}`
-  )
-  console.log(`[server]: Environment: ${config.server.env}`)
+  log.info('Server started', {
+    url: `http://${config.server.host}:${config.server.port}`,
+    environment: config.server.env
+  })
 })

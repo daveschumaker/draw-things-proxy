@@ -6,6 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import { config } from '../config'
 import { Constants } from '../models/constants'
+import { log } from '../utils/logger'
 
 type ImageProcessingConfig = {
   negative_original_height: number
@@ -148,7 +149,7 @@ export function addJob(payload: Partial<ImageProcessingConfig>): string {
   }
 
   queue.push(job)
-  console.log(`Job ${jobId} added to queue. Queue length: ${queue.length}`)
+  log.info('Job added to queue', { jobId, queueLength: queue.length })
   return jobId
 }
 
@@ -233,7 +234,7 @@ async function processJob(job: Job): Promise<void> {
   job.status = JobStatus.PROCESSING
 
   try {
-    console.log(`Processing job ${job.jobId}`)
+    log.info('Processing job', { jobId: job.jobId })
     const response = await fetch(targetUrl, {
       agent,
       method: 'POST',
@@ -248,7 +249,7 @@ async function processJob(job: Job): Promise<void> {
     }
 
     await saveImage(data.images[0], job.jobId)
-    console.log(`Job ${job.jobId} completed successfully`)
+    log.info('Job completed successfully', { jobId: job.jobId })
 
     // Mark job as completed and move to completed jobs
     job.status = JobStatus.COMPLETED
@@ -259,11 +260,12 @@ async function processJob(job: Job): Promise<void> {
     cleanupCompletedJobs()
 
     queue = queue.filter((queuedJob) => queuedJob.jobId !== job.jobId)
-    console.log(
-      `Job ${job.jobId} removed from queue. Queue length: ${queue.length}`
-    )
+    log.debug('Job removed from queue', {
+      jobId: job.jobId,
+      queueLength: queue.length
+    })
   } catch (error) {
-    console.error(`Error processing job ${job.jobId}:`, error)
+    log.error('Error processing job', { jobId: job.jobId, error })
 
     // Safe error type checking
     const isConnectionError =
@@ -273,14 +275,14 @@ async function processJob(job: Job): Promise<void> {
       (error.code === 'ECONNRESET' || error.type === 'system')
 
     if (isConnectionError) {
-      console.log(`Attempting to fetch local image for job ${job.jobId}`)
+      log.info('Attempting to fetch local image', { jobId: job.jobId })
       try {
         const localImageBase64 = await getLocalImage(job.payload.seed)
         if (localImageBase64) {
           await saveImage(localImageBase64, job.jobId)
-          console.log(
-            `Job ${job.jobId} completed successfully with local image`
-          )
+          log.info('Job completed successfully with local image', {
+            jobId: job.jobId
+          })
 
           // Mark job as completed
           job.status = JobStatus.COMPLETED
@@ -292,10 +294,10 @@ async function processJob(job: Job): Promise<void> {
           return
         }
       } catch (localError) {
-        console.error(
-          `Error fetching local image for job ${job.jobId}:`,
-          localError
-        )
+        log.error('Error fetching local image', {
+          jobId: job.jobId,
+          error: localError
+        })
       }
     }
 
@@ -303,13 +305,16 @@ async function processJob(job: Job): Promise<void> {
       job.retries++
       job.status = JobStatus.PENDING // Reset to pending for retry
       queue.push(job)
-      console.log(
-        `Retrying job ${job.jobId} (attempt ${job.retries}). Queue length: ${queue.length}`
-      )
+      log.info('Retrying job', {
+        jobId: job.jobId,
+        attempt: job.retries,
+        queueLength: queue.length
+      })
     } else {
-      console.error(
-        `Job ${job.jobId} failed after ${config.queue.maxRetries} retries.`
-      )
+      log.error('Job failed after max retries', {
+        jobId: job.jobId,
+        maxRetries: config.queue.maxRetries
+      })
 
       // Mark job as failed and move to completed jobs
       job.status = JobStatus.FAILED
@@ -322,9 +327,10 @@ async function processJob(job: Job): Promise<void> {
       cleanupCompletedJobs()
 
       queue = queue.filter((queuedJob) => queuedJob.jobId !== job.jobId)
-      console.log(
-        `Job ${job.jobId} removed from queue after max retries. Queue length: ${queue.length}`
-      )
+      log.debug('Job removed from queue after max retries', {
+        jobId: job.jobId,
+        queueLength: queue.length
+      })
     }
   }
 }
@@ -337,7 +343,7 @@ function cleanupCompletedJobs(): void {
   for (const [jobId, job] of completedJobs.entries()) {
     if (job.completedAt && now - job.completedAt > config.queue.completedJobTTL) {
       completedJobs.delete(jobId)
-      console.log(`Cleaned up completed job ${jobId}`)
+      log.debug('Cleaned up completed job', { jobId })
     }
   }
 }
