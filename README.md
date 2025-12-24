@@ -94,6 +94,25 @@ Generate an image using the DrawThings API.
 }
 ```
 
+**Parameter Defaults:**
+
+The proxy forwards all parameters directly to DrawThings without setting defaults (except for `seed`). This means:
+
+- **Omitted parameters**: DrawThings will use its own internal defaults
+- **Seed handling**: If not provided or set to `-1`, the proxy generates a random seed (1-4294967295)
+- **All other parameters**: Passed through as-is to DrawThings
+
+This approach ensures flexibility and allows DrawThings to control its own defaults without requiring the proxy to be updated when DrawThings changes.
+
+**Available Parameters:**
+
+See the [complete parameter list](src/models/schemas.ts) for all supported options including:
+- Basic: `prompt` (required), `negative_prompt`, `width`, `height`, `steps`, `seed`, `batch_size`, `batch_count`
+- Guidance: `guidance_scale`, `aesthetic_score`, `sharpness`
+- Models: `sampler`, `model`, `refiner_model`, `refiner_start`
+- Advanced: `hires_fix`, `upscaler`, `clip_skip`, `tiled_decoding`, `loras`, `controls`
+- Video/Animation: `fps`, `num_frames`, `motion_scale`
+
 **Rate Limit:** 10 requests per minute (configurable)
 
 ### GET /api/status
