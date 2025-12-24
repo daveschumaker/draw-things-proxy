@@ -64,6 +64,15 @@ export const config = {
   },
 
   /**
+   * Rate limiting configuration
+   */
+  rateLimit: {
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    maxRequests: env.RATE_LIMIT_MAX_REQUESTS,
+    generateMax: env.RATE_LIMIT_GENERATE_MAX
+  },
+
+  /**
    * CORS configuration
    */
   cors: {

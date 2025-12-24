@@ -6,6 +6,7 @@ import routes from './routes'
 import jobController from './controllers/jobController'
 import { checkImageGenerationAppStatus } from './controllers/imageAppController'
 import { errorHandler } from './middleware/errorHandler'
+import { generalLimiter } from './middleware/rateLimiter'
 
 const app: Express = express()
 
@@ -23,6 +24,9 @@ app.use(express.urlencoded({ extended: true }))
 
 // Security headers
 app.use(helmet())
+
+// Rate limiting
+app.use(generalLimiter)
 
 // API routes
 app.use('/api', routes)

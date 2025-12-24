@@ -6,11 +6,13 @@ import { imageGenerationSchema } from '../models/schemas'
 import { asyncHandler } from '../middleware/errorHandler'
 import { sendSuccess } from '../utils/apiResponse'
 import { ServiceUnavailableError } from '../errors'
+import { generateLimiter } from '../middleware/rateLimiter'
 
 const router = Router()
 
 router.post(
   '/',
+  generateLimiter,
   validateBody(imageGenerationSchema),
   asyncHandler(async (req: Request, res: Response) => {
     if (!getImageGenerationAppStatus()) {

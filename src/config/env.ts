@@ -26,10 +26,7 @@ const envSchema = z.object({
     .string()
     .url()
     .default('http://127.0.0.1:7860/sdapi/v1/txt2img'),
-  DRAW_THINGS_STATUS_URL: z
-    .string()
-    .url()
-    .default('http://127.0.0.1:7860/'),
+  DRAW_THINGS_STATUS_URL: z.string().url().default('http://127.0.0.1:7860/'),
 
   // Directory configuration
   SAVE_IMAGE_DIR: z.string().min(1),
@@ -47,6 +44,11 @@ const envSchema = z.object({
   // Request limits
   REQUEST_BODY_SIZE_LIMIT: z.string().default('1mb'),
   REQUEST_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
+
+  // Rate limiting configuration
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000), // 1 minute
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).default(100),
+  RATE_LIMIT_GENERATE_MAX: z.coerce.number().int().min(1).default(10),
 
   // CORS configuration
   CORS_ORIGIN: z.string().default('*'),
