@@ -132,3 +132,5 @@ build
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+# Claude Code working directory
+.claude/
