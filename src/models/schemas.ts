@@ -157,8 +157,18 @@ export const imageParamsSchema = z.object({
 })
 
 /**
+ * Schema for image query parameters
+ * Validates format conversion and response type options
+ */
+export const imageQuerySchema = z.object({
+  format: z.enum(['png', 'webp', 'jpg', 'jpeg']).optional().default('png'),
+  response: z.enum(['file', 'base64']).optional().default('file')
+})
+
+/**
  * Type inference from schemas
  */
 export type ImageGenerationRequest = z.infer<typeof imageGenerationSchema>
 export type JobStatusQuery = z.infer<typeof jobStatusQuerySchema>
 export type ImageParams = z.infer<typeof imageParamsSchema>
+export type ImageQuery = z.infer<typeof imageQuerySchema>
