@@ -3,7 +3,7 @@
  */
 
 import { Request, Response } from 'express'
-import { validateBody, validateQuery } from './validation'
+import { validateBody, validateQuery, validateParams } from './validation'
 import { z } from 'zod'
 
 describe('validation middleware', () => {
@@ -112,6 +112,60 @@ describe('validation middleware', () => {
       mockRequest.query = {}
 
       const middleware = validateQuery(testSchema)
+      middleware(mockRequest as Request, mockResponse as Response, nextFunction)
+
+      expect(nextFunction).toHaveBeenCalled()
+    })
+  })
+
+  describe('validateParams', () => {
+    const testSchema = z.object({
+      id: z
+        .string()
+        .min(1)
+        .regex(/^[a-zA-Z0-9_.-]+$/)
+        .refine((id) => !id.includes('..'))
+    })
+
+    it('should call next() when params validation passes', () => {
+      mockRequest.params = { id: 'valid-job-id-123' }
+
+      const middleware = validateParams(testSchema)
+      middleware(mockRequest as Request, mockResponse as Response, nextFunction)
+
+      expect(nextFunction).toHaveBeenCalled()
+      expect(mockResponse.status).not.toHaveBeenCalled()
+    })
+
+    it('should return 400 when params contain path traversal', () => {
+      mockRequest.params = { id: '../../../etc/passwd' }
+
+      const middleware = validateParams(testSchema)
+      middleware(mockRequest as Request, mockResponse as Response, nextFunction)
+
+      expect(nextFunction).not.toHaveBeenCalled()
+      expect(mockResponse.status).toHaveBeenCalledWith(400)
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Validation failed'
+        })
+      )
+    })
+
+    it('should return 400 when params contain invalid characters', () => {
+      mockRequest.params = { id: 'job/with/slashes' }
+
+      const middleware = validateParams(testSchema)
+      middleware(mockRequest as Request, mockResponse as Response, nextFunction)
+
+      expect(nextFunction).not.toHaveBeenCalled()
+      expect(mockResponse.status).toHaveBeenCalledWith(400)
+    })
+
+    it('should allow safe special characters', () => {
+      mockRequest.params = { id: 'job-with_dots.and-dashes' }
+
+      const middleware = validateParams(testSchema)
       middleware(mockRequest as Request, mockResponse as Response, nextFunction)
 
       expect(nextFunction).toHaveBeenCalled()

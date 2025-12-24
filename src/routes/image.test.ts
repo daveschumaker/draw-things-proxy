@@ -56,4 +56,67 @@ describe('GET /image/:id', () => {
     // Will fail to find file, but route should accept the format
     expect([404, 500]).toContain(response.status)
   })
+
+  // Path traversal attack prevention tests
+  describe('Path Traversal Protection', () => {
+    it('should reject job id with parent directory traversal (..)', async () => {
+      const response = await request(app).get('/..%2Fetc%2Fpasswd')
+
+      expect(response.status).toBe(400)
+      expect(response.body).toMatchObject({
+        error: 'Validation failed',
+        details: expect.arrayContaining([
+          expect.objectContaining({
+            message: expect.stringContaining('cannot contain')
+          })
+        ])
+      })
+    })
+
+    it('should reject job id with encoded slash (%2F)', async () => {
+      const response = await request(app).get('/path%2Fto%2Ffile')
+
+      expect(response.status).toBe(400)
+      expect(response.body.error).toBe('Validation failed')
+    })
+
+    it('should reject job id with backslash', async () => {
+      const response = await request(app).get('/path\\to\\file')
+
+      // Express routing may not match this as a valid :id param, resulting in 404
+      // Either 400 (validation) or 404 (no route match) is acceptable
+      expect([400, 404]).toContain(response.status)
+    })
+
+    it('should reject job id with double dots', async () => {
+      const response = await request(app).get('/..%2F..%2Fsecret')
+
+      expect(response.status).toBe(400)
+      expect(response.body.error).toBe('Validation failed')
+    })
+
+    it('should reject job id with invalid characters like angle brackets', async () => {
+      const response = await request(app).get('/job%3Cscript%3E')
+
+      expect(response.status).toBe(400)
+      expect(response.body.error).toBe('Validation failed')
+    })
+
+    it('should accept safe job IDs with dots', async () => {
+      // Dots are allowed but not consecutive dots (..)
+      const response = await request(app).get('/job.123.test')
+
+      // Will fail to find file, but validation should pass
+      expect(response.status).toBe(404)
+      expect(response.body.error).toBe('NotFound')
+    })
+
+    it('should accept safe job IDs with dashes and underscores', async () => {
+      const response = await request(app).get('/job-test_123')
+
+      // Will fail to find file, but validation should pass
+      expect(response.status).toBe(404)
+      expect(response.body.error).toBe('NotFound')
+    })
+  })
 })

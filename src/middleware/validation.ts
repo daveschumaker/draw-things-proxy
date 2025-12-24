@@ -63,3 +63,34 @@ export function validateQuery<T extends z.ZodType>(schema: T) {
     }
   }
 }
+
+/**
+ * Middleware factory to validate route parameters against a Zod schema
+ * Useful for validating :id params to prevent path traversal attacks
+ *
+ * @param schema - Zod schema to validate against
+ * @returns Express middleware function
+ */
+export function validateParams<T extends z.ZodType>(schema: T) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      req.params = schema.parse(req.params) as any
+      next()
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          error: 'Validation failed',
+          details: error.issues.map((err) => ({
+            path: err.path.join('.'),
+            message: err.message
+          }))
+        })
+      } else {
+        res.status(500).json({
+          error: 'Internal validation error'
+        })
+      }
+    }
+  }
+}

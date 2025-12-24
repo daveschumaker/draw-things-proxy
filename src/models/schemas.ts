@@ -108,6 +108,28 @@ export const imageGenerationSchema = z.object({
 })
 
 /**
+ * Job ID validation regex
+ * Job IDs must be alphanumeric with optional hyphens, underscores, and dots
+ * No path traversal characters (/, \, ..) allowed
+ */
+const jobIdPattern = /^[a-zA-Z0-9_.-]+$/
+
+/**
+ * Schema for validating a single job ID
+ * Prevents path traversal attacks by restricting to safe characters
+ */
+export const jobIdSchema = z
+  .string()
+  .min(1, 'Job ID is required')
+  .max(100, 'Job ID too long')
+  .regex(jobIdPattern, 'Job ID contains invalid characters')
+  .refine((id) => !id.includes('..'), 'Job ID cannot contain ".."')
+  .refine(
+    (id) => !id.includes('/') && !id.includes('\\'),
+    'Job ID cannot contain path separators'
+  )
+
+/**
  * Schema for job status query
  * Validates the job ID query parameter
  */
@@ -127,7 +149,16 @@ export const jobStatusQuerySchema = z.object({
 })
 
 /**
+ * Schema for image route parameters
+ * Validates the job ID in /api/image/:id to prevent path traversal
+ */
+export const imageParamsSchema = z.object({
+  id: jobIdSchema
+})
+
+/**
  * Type inference from schemas
  */
 export type ImageGenerationRequest = z.infer<typeof imageGenerationSchema>
 export type JobStatusQuery = z.infer<typeof jobStatusQuerySchema>
+export type ImageParams = z.infer<typeof imageParamsSchema>
