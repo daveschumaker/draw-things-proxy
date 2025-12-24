@@ -3,6 +3,7 @@ import generateRouter from './generate'
 import imageRouter from './image'
 import statusRouter from './status'
 import { getImageGenerationAppStatus } from '../controllers/imageAppController'
+import { sendSuccess } from '../utils/apiResponse'
 
 const router = Router()
 
@@ -12,7 +13,7 @@ router.use('/status', statusRouter)
 
 router.get('/heartbeat', (req: Request, res: Response) => {
   const isAlive = getImageGenerationAppStatus()
-  res.json({ isAlive })
+  sendSuccess(res, { isAlive })
 })
 
 export default router

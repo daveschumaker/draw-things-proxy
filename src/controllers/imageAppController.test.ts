@@ -8,6 +8,15 @@ import {
 } from './imageAppController'
 import fetch from 'node-fetch'
 
+// Mock config module
+jest.mock('../config', () => ({
+  config: {
+    drawThings: {
+      statusUrl: 'http://localhost:7860/'
+    }
+  }
+}))
+
 jest.mock('node-fetch')
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>
 
@@ -26,7 +35,7 @@ describe('imageAppController', () => {
       const status = getImageGenerationAppStatus()
 
       expect(status).toBe(true)
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7860')
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7860/')
     })
 
     it('should set status to false when app responds with not ok', async () => {

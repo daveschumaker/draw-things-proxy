@@ -4,6 +4,7 @@ import fetch from 'node-fetch'
 import { saveImage } from '../utils/imageUtils'
 import fs from 'fs'
 import path from 'path'
+import { config } from '../config'
 import { Constants } from '../models/constants'
 
 type ImageProcessingConfig = {
@@ -102,8 +103,6 @@ interface Job {
 
 let queue: Job[] = []
 const completedJobs: Map<string, Job> = new Map()
-const MAX_RETRIES = 3
-const COMPLETED_JOB_TTL = 3600000 // 1 hour in milliseconds
 let isProcessing = false
 
 const agent = new http.Agent({
@@ -223,7 +222,7 @@ interface ImageResponseSuccess {
 /**
  * Processes a single job by sending the request to the DrawThings API.
  * On connection errors, attempts to retrieve the image from the local filesystem.
- * Failed jobs are retried up to MAX_RETRIES times before being marked as failed.
+ * Failed jobs are retried based on configured max retries before being marked as failed.
  *
  * @param job - The job to process
  */
@@ -300,7 +299,7 @@ async function processJob(job: Job): Promise<void> {
       }
     }
 
-    if (job.retries < MAX_RETRIES) {
+    if (job.retries < config.queue.maxRetries) {
       job.retries++
       job.status = JobStatus.PENDING // Reset to pending for retry
       queue.push(job)
@@ -308,7 +307,9 @@ async function processJob(job: Job): Promise<void> {
         `Retrying job ${job.jobId} (attempt ${job.retries}). Queue length: ${queue.length}`
       )
     } else {
-      console.error(`Job ${job.jobId} failed after ${MAX_RETRIES} retries.`)
+      console.error(
+        `Job ${job.jobId} failed after ${config.queue.maxRetries} retries.`
+      )
 
       // Mark job as failed and move to completed jobs
       job.status = JobStatus.FAILED
@@ -334,7 +335,7 @@ async function processJob(job: Job): Promise<void> {
 function cleanupCompletedJobs(): void {
   const now = Date.now()
   for (const [jobId, job] of completedJobs.entries()) {
-    if (job.completedAt && now - job.completedAt > COMPLETED_JOB_TTL) {
+    if (job.completedAt && now - job.completedAt > config.queue.completedJobTTL) {
       completedJobs.delete(jobId)
       console.log(`Cleaned up completed job ${jobId}`)
     }
@@ -383,9 +384,9 @@ async function getLocalImage(seed: number): Promise<string | null> {
  */
 async function processQueue(): Promise<void> {
   if (isProcessing || queue.length === 0) {
-    // If no jobs to process, check again in 2 seconds
+    // If no jobs to process, check again after poll interval
     if (!isProcessing && queue.length === 0) {
-      setTimeout(() => processQueue(), 2000)
+      setTimeout(() => processQueue(), config.queue.pollInterval)
     }
     return
   }
@@ -395,8 +396,8 @@ async function processQueue(): Promise<void> {
   await processJob(job)
   isProcessing = false
 
-  // Process next job after a 1 second delay
-  setTimeout(() => processQueue(), 1000)
+  // Process next job after configured delay
+  setTimeout(() => processQueue(), config.queue.processDelay)
 }
 
 /**

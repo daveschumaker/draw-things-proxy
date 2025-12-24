@@ -34,7 +34,10 @@ describe('GET /status', () => {
     const response = await request(app).get('/').query({ id: 'job-123' })
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(mockStatuses)
+    expect(response.body).toEqual({
+      success: true,
+      data: mockStatuses
+    })
     expect(jobController.getJobStatuses).toHaveBeenCalledWith(['job-123'])
   })
 
@@ -62,7 +65,10 @@ describe('GET /status', () => {
       .query({ id: 'job-1,job-2,job-3' })
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(mockStatuses)
+    expect(response.body).toEqual({
+      success: true,
+      data: mockStatuses
+    })
     expect(jobController.getJobStatuses).toHaveBeenCalledWith([
       'job-1',
       'job-2',
@@ -88,7 +94,10 @@ describe('GET /status', () => {
       .query({ id: ['job-a', 'job-b'] })
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(mockStatuses)
+    expect(response.body).toEqual({
+      success: true,
+      data: mockStatuses
+    })
     expect(jobController.getJobStatuses).toHaveBeenCalledWith([
       'job-a',
       'job-b'
@@ -107,7 +116,10 @@ describe('GET /status', () => {
     const response = await request(app).get('/')
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(mockStatuses)
+    expect(response.body).toEqual({
+      success: true,
+      data: mockStatuses
+    })
     expect(jobController.getJobStatuses).toHaveBeenCalledWith([])
   })
 
@@ -156,6 +168,9 @@ describe('GET /status', () => {
     const response = await request(app).get('/').query({ id: 'fake-job' })
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(mockStatuses)
+    expect(response.body).toEqual({
+      success: true,
+      data: mockStatuses
+    })
   })
 })

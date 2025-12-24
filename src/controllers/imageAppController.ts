@@ -1,9 +1,10 @@
 /**
  * Controller for monitoring the health status of the DrawThings image generation application.
- * Tracks whether the DrawThings API server is accessible on localhost:7860.
+ * Tracks whether the DrawThings API server is accessible.
  */
 
 import fetch from 'node-fetch'
+import { config } from '../config'
 
 let isAlive = false
 
@@ -14,7 +15,7 @@ let isAlive = false
  */
 export const checkImageGenerationAppStatus = async (): Promise<void> => {
   try {
-    const response = await fetch('http://localhost:7860')
+    const response = await fetch(config.drawThings.statusUrl)
     if (response.ok) {
       isAlive = true
     } else {

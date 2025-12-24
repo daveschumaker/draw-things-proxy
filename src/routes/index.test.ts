@@ -6,6 +6,7 @@ import request from 'supertest'
 import express, { Express } from 'express'
 import router from './index'
 import * as imageAppController from '../controllers/imageAppController'
+import { errorHandler } from '../middleware/errorHandler'
 
 jest.mock('../controllers/imageAppController')
 jest.mock('../controllers/jobController')
@@ -17,6 +18,7 @@ describe('Main Router', () => {
     app = express()
     app.use(express.json())
     app.use('/api', router)
+    app.use(errorHandler)
     jest.clearAllMocks()
   })
 
@@ -29,7 +31,10 @@ describe('Main Router', () => {
       const response = await request(app).get('/api/heartbeat')
 
       expect(response.status).toBe(200)
-      expect(response.body).toEqual({ isAlive: true })
+      expect(response.body).toEqual({
+        success: true,
+        data: { isAlive: true }
+      })
     })
 
     it('should return isAlive false when app is not running', async () => {
@@ -40,7 +45,10 @@ describe('Main Router', () => {
       const response = await request(app).get('/api/heartbeat')
 
       expect(response.status).toBe(200)
-      expect(response.body).toEqual({ isAlive: false })
+      expect(response.body).toEqual({
+        success: true,
+        data: { isAlive: false }
+      })
     })
   })
 
@@ -66,8 +74,12 @@ describe('Main Router', () => {
     it('should mount /image route', async () => {
       const response = await request(app).get('/api/image/test-id')
 
-      // Should get a response from the image route (not 404)
-      expect(response.status).not.toBe(404)
+      // Should get a 404 response from the image route (file doesn't exist in tests)
+      expect(response.status).toBe(404)
+      expect(response.body).toMatchObject({
+        error: 'NotFound',
+        message: expect.stringContaining('test-id')
+      })
     })
   })
 })

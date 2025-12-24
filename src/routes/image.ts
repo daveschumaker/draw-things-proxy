@@ -1,11 +1,12 @@
-import { Router, Request, Response } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import path from 'path'
 import { Constants } from '../models/constants'
+import { NotFoundError, InternalServerError } from '../errors'
 
 const router = Router()
 const imageDir = Constants.SAVE_IMAGE_DIR
 
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   const imagePath = path.join(imageDir, `${req.params.id}.png`)
   let isRequestClosed = false
 
@@ -20,7 +21,12 @@ router.get('/:id', (req: Request, res: Response) => {
 
     if (err) {
       if (!res.headersSent) {
-        res.status(500).send('Error serving image')
+        // Check if file not found by error code
+        if ('code' in err && err.code === 'ENOENT') {
+          next(new NotFoundError(`Image not found: ${req.params.id}`))
+        } else {
+          next(new InternalServerError('Error serving image', { originalError: err.message }))
+        }
       }
     }
   })

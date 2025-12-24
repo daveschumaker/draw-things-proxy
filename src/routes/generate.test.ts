@@ -7,6 +7,7 @@ import express, { Express } from 'express'
 import generateRouter from './generate'
 import * as imageAppController from '../controllers/imageAppController'
 import * as jobController from '../controllers/jobController'
+import { errorHandler } from '../middleware/errorHandler'
 
 jest.mock('../controllers/imageAppController')
 jest.mock('../controllers/jobController')
@@ -18,6 +19,7 @@ describe('POST /generate', () => {
     app = express()
     app.use(express.json())
     app.use('/', generateRouter)
+    app.use(errorHandler)
     jest.clearAllMocks()
   })
 
@@ -29,8 +31,9 @@ describe('POST /generate', () => {
     const response = await request(app).post('/').send({ prompt: 'test' })
 
     expect(response.status).toBe(503)
-    expect(response.body).toEqual({
-      error: 'Image generation app is not running'
+    expect(response.body).toMatchObject({
+      error: 'ServiceUnavailable',
+      message: 'Image generation app is not running'
     })
   })
 
@@ -52,10 +55,14 @@ describe('POST /generate', () => {
 
     const response = await request(app).post('/').send(payload)
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(201)
     expect(response.body).toEqual({
-      jobId: mockJobId,
-      position: mockPosition
+      success: true,
+      message: 'Job added to queue',
+      data: {
+        jobId: mockJobId,
+        position: mockPosition
+      }
     })
     expect(jobController.addJob).toHaveBeenCalledWith(payload)
     expect(jobController.getJobPosition).toHaveBeenCalledWith(mockJobId)
@@ -72,7 +79,10 @@ describe('POST /generate', () => {
     const response = await request(app).post('/').send({ prompt: 'test' })
 
     expect(response.status).toBe(500)
-    expect(response.body).toEqual({ error: 'Failed to add job' })
+    expect(response.body).toMatchObject({
+      error: 'Internal Server Error',
+      message: 'Queue full'
+    })
   })
 
   it('should accept minimal payload', async () => {
@@ -87,8 +97,9 @@ describe('POST /generate', () => {
 
     const response = await request(app).post('/').send({ prompt: 'test' })
 
-    expect(response.status).toBe(200)
-    expect(response.body.jobId).toBe(mockJobId)
+    expect(response.status).toBe(201)
+    expect(response.body.success).toBe(true)
+    expect(response.body.data.jobId).toBe(mockJobId)
   })
 
   it('should accept complex payload with all parameters', async () => {
@@ -114,7 +125,7 @@ describe('POST /generate', () => {
 
     const response = await request(app).post('/').send(complexPayload)
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(201)
     expect(jobController.addJob).toHaveBeenCalledWith(complexPayload)
   })
 })

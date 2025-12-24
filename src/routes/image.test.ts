@@ -5,6 +5,7 @@
 import request from 'supertest'
 import express, { Express } from 'express'
 import imageRouter from './image'
+import { errorHandler } from '../middleware/errorHandler'
 
 // Mock Constants module
 jest.mock('../models/constants', () => ({
@@ -21,6 +22,7 @@ describe('GET /image/:id', () => {
   beforeEach(() => {
     app = express()
     app.use('/', imageRouter)
+    app.use(errorHandler)
     jest.clearAllMocks()
   })
 
@@ -31,10 +33,12 @@ describe('GET /image/:id', () => {
     // but we can verify the route accepts the request
     const response = await request(app).get(`/${jobId}`)
 
-    // The response will be an error since the file doesn't exist,
-    // but we're testing the routing logic
-    expect(response.status).toBe(500)
-    expect(response.text).toBe('Error serving image')
+    // The response will be a 404 error since the file doesn't exist
+    expect(response.status).toBe(404)
+    expect(response.body).toMatchObject({
+      error: 'NotFound',
+      message: expect.stringContaining(jobId)
+    })
   })
 
   it('should handle special characters in job id', async () => {

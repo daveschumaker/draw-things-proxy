@@ -3,30 +3,27 @@ import { addJob, getJobPosition } from '../controllers/jobController'
 import { getImageGenerationAppStatus } from '../controllers/imageAppController'
 import { validateBody } from '../middleware/validation'
 import { imageGenerationSchema } from '../models/schemas'
+import { asyncHandler } from '../middleware/errorHandler'
+import { sendSuccess } from '../utils/apiResponse'
+import { ServiceUnavailableError } from '../errors'
 
 const router = Router()
 
 router.post(
   '/',
   validateBody(imageGenerationSchema),
-  async (req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     if (!getImageGenerationAppStatus()) {
-      return res
-        .status(503)
-        .json({ error: 'Image generation app is not running' })
+      throw new ServiceUnavailableError('Image generation app is not running')
     }
 
-    try {
-      console.log('Received generate request:', req.body)
-      const jobId = addJob(req.body)
-      const position = getJobPosition(jobId)
-      console.log(`Job ${jobId} added at position ${position}`)
-      res.json({ jobId, position })
-    } catch (error) {
-      console.error('Error adding job:', error)
-      res.status(500).json({ error: 'Failed to add job' })
-    }
-  }
+    console.log('Received generate request:', req.body)
+    const jobId = addJob(req.body)
+    const position = getJobPosition(jobId)
+    console.log(`Job ${jobId} added at position ${position}`)
+
+    sendSuccess(res, { jobId, position }, 201, 'Job added to queue')
+  })
 )
 
 export default router
